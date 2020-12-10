@@ -401,6 +401,15 @@ last.fm.calendar %>%
     panel.border = element_blank(),
     plot.margin = margin(0.7,0.7,0.7,0.7,"cm") # top, right, bottom, left
   ) 
+
+p
+
+ggsave(p,
+       filename="lastfm_tile_plot.png",
+       height = 8.8,
+       width = 8.8,
+       units = "in",
+       dpi = 200)
     
 # https://stackoverflow.com/questions/3099219/ggplot-with-2-y-axes-on-each-side-and-different-scales
 
