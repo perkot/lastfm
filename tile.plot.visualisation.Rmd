@@ -1,0 +1,437 @@
+---
+title: "Tile plot visualising five-years oflast.fm data"
+author: "Tom Perkins"
+date: "30 January 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+
+Medium contributor Sebastian Wolf released a package that extracts music-listening data from last.fm. He wrote about it [here](https://towardsdatascience.com/music-listener-statistics-last-fms-last-year-as-an-r-package-c21ac7eee102 "medium article"), & I used it to summarise my listening habits in a subsequent post [here](https://perkot.github.io/lastfm/)
+
+In this post, I will take you through the steps to construct a tile plot, depicting daily # of song listens over the past 5 years:
+
+![Alt text](/Users/perkot/Dropbox/Analytics/Personal/R/git/lastfm/lastfm_tile_plot.png)
+Let's begin by loading the required packages :
+
+```{r Load dependencies, results='hide', message=FALSE, warning=FALSE}
+library(analyzelastfm)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(data.table)
+library(kableExtra)
+library(anytime)
+library(lubridate)
+library(zoo)
+library(ggplot2)
+library(plotly)
+```
+
+## Data
+
+My [previous post](https://perkot.github.io/lastfm/) outlines the steps required for gathering last.fm scrobble data, including API_key creation, package download, data-extraction & cleaning. Here, we will read in an already cleaned .csv of this data
+
+```{r API, echo=FALSE}
+last.fm.df <- read.csv("lastfm1619.csv",
+                       header = TRUE,
+                       stringsAsFactors=FALSE)
+```
+
+which produces a dataframe summarizing ~ 30,000 individual "scrobbles", or song-listens over the past 5 years 
+
+```{r print table preview three, echo=FALSE}
+kable(head(last.fm.df))%>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive", font_size = 6))
+```
+
+Before we can produce the visualization, some basic data-prep is needed
+
+## Data Prep 
+
+```{r DP1, echo=FALSE}
+# extract out the calendar 'day' from date 
+last.fm.df$day <- substr(x = last.fm.df$Date.EST, 
+                         start = 9, 
+                         stop = 10)
+```
+
+```{r DP2, echo=FALSE}
+# Aggregate total listens by date 
+last.fm.calendar <- last.fm.df %>% 
+  group_by(Date.EST) %>% 
+  summarise(daily_listens = n())
+```
+
+```{r DP3, echo=FALSE}
+# ensure in df format 
+last.fm.calendar <- as.data.frame(last.fm.calendar)
+```
+
+# Crucial step 
+  # on dates where I have not listened to music, they are absent from the df
+  # as such we need to create "empty records" for these dates, so that they are
+  # reflected in the visualisation 
+
+```{r DP4, echo=FALSE}
+# Complete out dates
+last.fm.calendar <- 
+last.fm.calendar %>%
+  mutate(Date.EST = as.Date(Date.EST)) %>%
+  complete(Date.EST = seq.Date(min(Date.EST), max(Date.EST), by="day"))
+```
+
+# Replace NA values with a 0, reflecting no listens on that date 
+last.fm.calendar[is.na(last.fm.calendar)] <- 0
+```
+
+```{r DP5, echo=FALSE}
+# Extract out day from date for visualisation 
+last.fm.calendar$day <- substr(x = last.fm.calendar$Date.EST, 
+                         start = 9, 
+                         stop = 10)
+```
+
+```{r DP6, echo=FALSE}
+# Create "Year-Month" column - y axis 
+setDT(last.fm.calendar)[, yr_month := format(as.Date(Date.EST), "%Y-%m") ]
+```
+
+```{r DP7, echo=FALSE}
+# Create year column - y axis labels 
+last.fm.calendar$Year <- year(last.fm.calendar$Date.EST)
+```
+
+
+
+```{r install package, results='hide', message=FALSE, warning=FALSE}
+devtools::install_github("zappingseb/analyze_last_fm")
+```
+
+
+An API Key from last.fm is required to use this package. It can be requested [here](https://www.last.fm/api/account/create "last.fm API")
+
+```{r API, echo=FALSE, include=FALSE}
+api_key <- "3201a3f5635a9e01a9bcb836729e3463"
+```
+
+The 32-character key needs to be saved as a data-object, as per below 
+
+api_key <- "insert api key here"
+
+Thereafter we can retrieve last.fm data for any specified user. My username is Perkski which I thought was cool back in 2008
+
+Let's get some data :
+
+```{r load data, warning=FALSE, message=FALSE, results='hide'}
+# Read in data for 2016, 2017 and 2018
+last.fm.data.2018 <- UserData$new("Perkski", api_key, 2018)
+last.fm.data.2017 <- UserData$new("Perkski", api_key, 2017)
+last.fm.data.2016 <- UserData$new("Perkski", api_key, 2016)
+```
+
+We can now extract the dataframes for each year, and bind into a single dataframe 
+
+```{r dataframes}
+# Extract out datframes from last.fm environments
+last.fm.df.2018 <- as.data.frame(as.list(last.fm.data.2018$data_table))
+last.fm.df.2017 <- as.data.frame(as.list(last.fm.data.2017$data_table))
+last.fm.df.2016 <- as.data.frame(as.list(last.fm.data.2016$data_table))
+
+# Bind 2016 2017 and 2018
+last.fm.df <- rbind(last.fm.df.2016, last.fm.df.2017, last.fm.df.2018)
+```
+
+The dataframe summarises artist, track, album and time of listening. It appears New Years Eve 2016 was a bit of a 70's/80's themed affair!
+
+```{r print table preview, echo=FALSE}
+kable(head(last.fm.df))%>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive", font_size = 6))
+```
+
+## Data Cleaning
+
+Cleaning this dataframe required three broad steps : 
+
+- Removal of non-music scrobbles, 
+- Removal of duplicate scrobbles
+- Correction of timezone
+
+I'll first remove non-music scrobbles   
+
+```{r remove non-music data}
+# Remove non-music scrobbles
+last.fm.df <- last.fm.df[ !(last.fm.df$artist %in% 
+c("<Sconosciuto>", "1 Hour of Relaxing Zelda", "2814", "Valhalla DSP",
+  "Valhalla DSP Plugin Presets", "inclair Broadcast Group",
+  "GoldenEye", "Larry David Is OK With Women Who Only Love Fame",
+  "Outlaw King", "Game Of Thrones Season 6 Episode 10 Music",
+  "ValhallaVintageVerb Ambient Guitar Jam", "Valhalla Shimmer Reverb",
+  "Garageband Quick Tip", "Perkot", "Ozzy Man Reviews: Iguana vs Snakes",
+  "The Simpsons")), ]
+```
+
+The aforementioned duplicates appear to be a quirk of my last.fm account. I believe it to be a glitch caused by using two devices to scrobble music. Occasionally, a single song-listen will be duplicated, once from each device
+
+My first approach to remedying this problem is to remove any scrobble for which there exist identical date-times. These are clear duplicates, and removes ~ 4000 rows
+
+```{r remove duplicate scrobbles one}
+# Remove duplicate tracks where scrobble has doubled
+last.fm.df <- last.fm.df[!duplicated(last.fm.df[c("datetext")]),]
+```
+
+The data-set still has a large number of duplicates, with non-identical date-times. Knowing my listening habits I rarely listen to songs back to back, so I know these are duplications
+
+Although a little crude, my solution is to combine artists/tracks into a single column, then delete the first instance of any songs that occur in succession. This is not perfect as it will also delete any legitimate back-to-back listens of a song. However, it gives a reasonably strong approximation of my actual listening habits 
+
+This step removes ~ 1000 further rows, and creates a much more accurate data-set
+
+```{r remove duplicate scrobbles two}
+# Combine artist and song into single column 
+last.fm.df <- last.fm.df %>% 
+  mutate(artist.track = str_c(artist," - ",track))
+
+# This will delete first instance of any two tracks occurring in succession
+last.fm.df <- as.data.table(last.fm.df)[, .SD[1], by = rleid(artist.track)]
+```
+
+The final problem is that the data is captured in Universal Standard Time. As such, the listening times are not accurate
+
+Before remediating this, some re-formatting of the date-time data is required. The goals here are to:
+
+- Create separate date and time columns 
+- Convert date and time from factors into appropriately formatted data types
+- Convert UST to Melbourne/Sydney EST
+
+Let's duplicate the date-time variable, then separate into date and time columns
+
+```{r date and time}
+# Separate into time and date
+last.fm.df <- separate(last.fm.df, datetext, 
+                       into = c("Date.UT", "Time.UT"), 
+                       sep = ",")
+
+# convert data into more suitable format
+last.fm.df$Date.UT = as.Date(last.fm.df$Date.UT, "%d %B %Y")
+
+# Combine date and time back together
+last.fm.df <- last.fm.df %>% 
+  unite(DateTime.UT, c(Date.UT, Time.UT), sep = " ", remove = FALSE)
+
+# change to time format 
+last.fm.df$DateTime.UT <- as.POSIXct(last.fm.df$DateTime.UT, 
+                                     format="%Y-%m-%d %H:%M")
+```
+
+Convert our date-time data into Melbourne Eastern Standard Time ... 
+
++ 11 hours from UST
+
+```{r EST, message=FALSE, warning=FALSE}
+# Change to EST
+last.fm.df$DateTime.EST <- last.fm.df$DateTime.UT + hours(11)
+
+# Duplicate Date Time
+last.fm.df$DateTime.EST2 = last.fm.df$DateTime.EST
+
+# Separate into time and date
+last.fm.df <- separate(last.fm.df, DateTime.EST2, 
+                       into = c("Date.EST", "Time.EST"), 
+                       sep = " ")
+
+# Convert date from character format to date format
+last.fm.df$Date.EST = as.Date(last.fm.df$Date.EST)
+
+# Delete unrequired UST column  
+last.fm.df <- subset(last.fm.df, select = -c(5))
+```
+
+Re-name our columns 
+
+```{r names}
+# Change Names
+colnames(last.fm.df) <- c("ID", "Artist", "Track", "Album", 
+                          "DateTime.UT", "Date.UT", "Time.UT",
+                          "DateTime.EST", "Date.EST", "Time.EST")
+```
+
+Re-examining our table, we now have more flexible date and time data, in the correct format, and correct timezone!
+
+```{r print table preview two, echo=FALSE}
+kable(head(last.fm.df)) %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive", font_size = 6))
+```
+
+## Extract more information concerning day of the week 
+
+Now that we accurate date and time data, we can extract to further features necessary to compare day-to-day listening habits for weekdays versus weekends
+
+The first feature will be to extract hour of the day as a grouping variable 
+
+The way to do this is to round the listening time to the nearest hour 
+
+For example, a song listened to at 1:49:23PM will be rounded to 2:00:00, while a song listened to at 1:29:59PM will be rounded to 1:00:00
+
+This variable will serve as our x-axis to look at listening patterns across the day in a later plot
+
+```{r hour}
+# Round clock-time to nearest hour
+
+# Duplicate time of song scrobble columsn to create 'hour' column 
+last.fm.df$Hour = last.fm.df$Time.EST
+# Convert to time format
+last.fm.df$Hour <- as.POSIXct(last.fm.df$Hour, format = "%H:%M:%S")
+# Round to nearest hour
+last.fm.df$Hour = format(round(last.fm.df$Hour, units = "hours"), format = "%H:%M")
+```
+
+The second feature to be extracted is a grouping variable distinguishing weekdays from weekends. This is easy enough to do by first extracting out the day of the week, then further separating Monday-Friday from Saturday-Sunday
+
+```{r day of week}
+# Day of the week
+last.fm.df$DayofWeek <- weekdays(as.Date(last.fm.df$Date.EST))
+
+# Weekend/Weekday
+last.fm.df$DayType[
+  last.fm.df$DayofWeek == "Saturday" |
+    last.fm.df$DayofWeek == "Sunday"] <-
+  "Weekend"
+last.fm.df$DayType[is.na(last.fm.df$DayType)] <- "Weekday"
+```
+
+We'll preview our table one last time, in its complete state
+
+```{r print table preview three, echo=FALSE}
+kable(head(last.fm.df))%>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive", font_size = 6))
+```
+
+## Create and visualise plots
+
+We are now ready to explore our data. To begin, I've created a basic theme for our plots
+
+```{r create a minimalistic theme for bar plots}
+# Minimalistic theme for visualisation 
+theme_plot_text <-
+  theme(
+    plot.title = element_text(size = 10, hjust = 0.5),
+    axis.title = element_text(size = 10),
+    legend.title = element_text(size = 10),
+    axis.text = element_text(size = 7))
+```
+
+Before directly contrasting weekdays with weekends, it's worth a look at the top 20 artists I listened to between 2016 and 2018. Code and plot below 
+
+```{r create artists plot, warning=FALSE, message=FALSE}
+# Top Artists
+Top.Artist <-
+  filter(
+    last.fm.df) %>% 
+      group_by(Artist) %>% 
+      summarise(Artist.Listens = n()) %>%
+      arrange(desc(Artist.Listens)) %>% 
+      top_n(20) %>%
+      ggplot(
+        aes(x = reorder(Artist, -Artist.Listens), 
+            y = Artist.Listens,
+            fill = Artist.Listens,
+            group = 1)) +
+      geom_bar(stat = "identity") +
+      labs(x=NULL, y=NULL) +
+      scale_fill_gradient2(low = "#DD7E84", mid = "#C72833" , high = "#77181E",
+                             midpoint = 600) +
+      labs(title = "Total Artist Listens") + 
+      theme_bw() +
+      theme_plot_text +
+      labs(fill = 'Artist Listens') +
+      theme(axis.text.x=element_text(angle = -45, hjust = 0)) 
+```
+
+Clearly I've been on a War on Drugs binge :D
+
+```{r plot Artist, echo=FALSE}
+Top.Artist
+```
+
+Let's now construct a line-plot for listening habits across the day, for weekdays only 
+
+```{r create weekday plot, warning=FALSE}
+# Weekday
+Weekday <-
+filter(
+  last.fm.df, DayType == "Weekday")  %>% 
+  group_by(Hour) %>% 
+  summarise(Hourly.Listens = n()) %>%
+  ggplot(
+    aes(x = Hour, 
+        y = Hourly.Listens,
+        colour = Hourly.Listens,
+        group = 1)) +
+  geom_point() +
+  geom_line() +
+  ylab("Total song listens per hour") +
+  xlab("Time of day") +
+  scale_x_discrete(breaks=c("00:00", "03:00", "06:00", "09:00", 
+                            "12:00", "15:00", "18:00", "21:00"), drop = FALSE) +
+  scale_colour_gradient2(low = "#DD7E84", mid = "#C72833" , high = "#77181E",
+                         midpoint = 1200) +
+  labs(title = "Frequency of music listening across the day (Weekdays)") + 
+  theme_bw() +
+  theme_plot_text +
+  labs(color = 'Hourly Listens') 
+```
+
+There are some clear trends in my weekday listening habits ...
+
+- Almost all music listening occurs between 9AM - 5PM (while I'm at work!)
+- Peak listening times are around 12PM and 3-4PM
+- A clear drop occurs around 1230PM - 130PM ... When I go on lunch!
+
+```{r plot weekday, echo=FALSE}
+Weekday
+```
+
+And finally, a line-plot for listening habits across the day, for weekends 
+
+```{r create weekend plot, warning=FALSE}
+# Weekend
+Weekend <-
+filter(
+  last.fm.df, DayType == "Weekend")  %>% 
+  group_by(Hour) %>% 
+  summarise(Hourly.Listens = n()) %>%
+  ggplot(
+    aes(x = Hour, 
+        y = Hourly.Listens,
+        colour = Hourly.Listens,
+        group = 1)) +
+  geom_point() +
+  geom_line() +
+  ylab("Total song listens per hour") +
+  xlab("Time of day") +
+  scale_x_discrete(breaks=c("00:00", "03:00", "06:00", "09:00", 
+                            "12:00", "15:00", "18:00", "21:00"), drop = FALSE) +
+  scale_colour_gradient2(low = "#DD7E84", mid = "#C72833" , high = "#77181E",
+                         midpoint = 200) +
+  labs(title = "Frequency of music listening across the day (Weekends)") + 
+  theme_bw() +
+  theme_plot_text +
+  labs(color = 'Hourly Listens') 
+```
+
+Weekends clearly produce a different pattern of music listening to weekdays
+
+- Peak listening time is between 7PM-8PM. I will hasten a guess this corresponds to music for 'social purposes' - dinner parties, guests over etc 
+- Relatively speaking, a higher proportion of scrobbles in the wee-hours with quite a few listens around 12AM ... Party-time!
+
+```{r plot weekend, echo=FALSE}
+Weekend
+```
+
+## Conclusion
+
+My personal music listening habits vary between weekdays and weekends. On weekdays, most listening is concentrated in the early afternoon, and almost all listening occurs within work-hours. On weekends, most listening occurs in the early to late evening, probably overlapping with social engagement

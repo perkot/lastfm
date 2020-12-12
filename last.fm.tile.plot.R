@@ -229,10 +229,10 @@ last.fm.calendar$day <- substr(x = last.fm.calendar$Date.EST,
                          start = 9, 
                          stop = 10)
 
-# Create "Year-Month" column - our y axis 
+# Create "Year-Month" column - y axis 
 setDT(last.fm.calendar)[, yr_month := format(as.Date(Date.EST), "%Y-%m") ]
 
-# Create year column - our y axis labels 
+# Create year column - y axis labels 
 last.fm.calendar$Year <- year(last.fm.calendar$Date.EST)
 
 # -----------------
