@@ -11,9 +11,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Background
 
-Medium contributor Sebastian Wolf released a package that extracts music-listening data from last.fm. He wrote about it [here](https://towardsdatascience.com/music-listener-statistics-last-fms-last-year-as-an-r-package-c21ac7eee102 "medium article"), & I used it to summarise my listening habits in a subsequent post [here](https://perkot.github.io/lastfm/)
+Medium contributor Sebastian Wolf released a package that extracts music-listening data from last.fm. He wrote about it [here](https://towardsdatascience.com/music-listener-statistics-last-fms-last-year-as-an-r-package-c21ac7eee102 "medium article"), & I used it to summarize my listening habits in a subsequent post [here](https://perkot.github.io/lastfm/)
 
-In this post, I will take you through the steps to construct a tile plot, depicting daily # of song listens over the past 5 years:
+Here, I summarize five-years of listening history into a *tile plot* - an especialy engaging way to depict frequencies over time.
 
 ![Alt text](/Users/perkot/Dropbox/Analytics/Personal/R/git/lastfm/lastfm_tile_plot.png)
 Let's begin by loading the required packages :
@@ -34,7 +34,7 @@ library(plotly)
 
 ## Data
 
-My [previous post](https://perkot.github.io/lastfm/) outlines the steps required for gathering last.fm scrobble data, including API_key creation, package download, data-extraction & cleaning. Here, we will read in an already cleaned .csv of this data
+My [previous post](https://perkot.github.io/lastfm/) outlines the steps required for gathering last.fm scrobble data, including API_key creation, user-specification, package download, data-extraction & cleaning. For brevity, we will read in a cleaned .csv of the data from this post
 
 ```{r API, echo=FALSE}
 last.fm.df <- read.csv("lastfm1619.csv",
@@ -49,62 +49,78 @@ kable(head(last.fm.df))%>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive", font_size = 6))
 ```
 
-Before we can produce the visualization, some basic data-prep is needed
+Before we can produce the visualization, some basic data-prep is required
 
 ## Data Prep 
 
-```{r DP1, echo=FALSE}
-# extract out the calendar 'day' from date 
-last.fm.df$day <- substr(x = last.fm.df$Date.EST, 
-                         start = 9, 
-                         stop = 10)
-```
+Firstly - we need to transform the data from a view of *individual songs* to an aggregation counting song plays per day
 
 ```{r DP2, echo=FALSE}
 # Aggregate total listens by date 
 last.fm.calendar <- last.fm.df %>% 
-  group_by(Date.EST) %>% 
-  summarise(daily_listens = n())
+  group_by(Date.EST) %>% # group by calendar day
+  summarise(daily_listens = n()) # daily listens == count of songs
 ```
+
+Then a cautionary step to ensure this aggregated view is a dataframe
 
 ```{r DP3, echo=FALSE}
 # ensure in df format 
 last.fm.calendar <- as.data.frame(last.fm.calendar)
 ```
 
-# Crucial step 
-  # on dates where I have not listened to music, they are absent from the df
-  # as such we need to create "empty records" for these dates, so that they are
-  # reflected in the visualisation 
+This next step is an important one to fulfill the calendar aesthetic in the tile plot
+
+A problem is that for days I didn't listen to  music, the data doesn't a record of those dates. if *zero-listen days* populated a record with zero listens, this would be OK, but unfortunately they are **completely absent**. 
+
+Therefore we need to create empty records for these dates:
 
 ```{r DP4, echo=FALSE}
 # Complete out dates
 last.fm.calendar <- 
 last.fm.calendar %>%
-  mutate(Date.EST = as.Date(Date.EST)) %>%
-  complete(Date.EST = seq.Date(min(Date.EST), max(Date.EST), by="day"))
+  mutate(Date.EST = as.Date(Date.EST)) %>% # ensure date format
+  complete(Date.EST = seq.Date(min(Date.EST), max(Date.EST), by="day")) # completes date-values not included 
 ```
 
+Then populate the null values with a zero
+
+```{r DP5, echo=FALSE}
 # Replace NA values with a 0, reflecting no listens on that date 
 last.fm.calendar[is.na(last.fm.calendar)] <- 0
 ```
 
-```{r DP5, echo=FALSE}
+Which results in a record for every date from 2016 through to 2020
+
+The next step is to ensure we have columns, corresponding to the axes on the plot
+
+Along the *x-axis* - the plot will utilize the calendar day of the month. With simple reg-ex, this can be extracted from the date
+
+```{r DP6, echo=FALSE}
 # Extract out day from date for visualisation 
 last.fm.calendar$day <- substr(x = last.fm.calendar$Date.EST, 
                          start = 9, 
                          stop = 10)
 ```
 
-```{r DP6, echo=FALSE}
+```{r DP7, echo=FALSE}
 # Create "Year-Month" column - y axis 
 setDT(last.fm.calendar)[, yr_month := format(as.Date(Date.EST), "%Y-%m") ]
 ```
 
-```{r DP7, echo=FALSE}
+```{r DP8, echo=FALSE}
 # Create year column - y axis labels 
 last.fm.calendar$Year <- year(last.fm.calendar$Date.EST)
 ```
+
+
+
+
+
+
+
+
+
 
 
 

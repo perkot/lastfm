@@ -276,17 +276,27 @@ last.fm.calendar %>%
                              breaks = sl, # specify breaks for legend format rather than colour scale
                              reverse = TRUE)) + # descending rather than ascending order for scale
 
-  # Really useful method to specify our own values for y-axis
+  # Specify custom axis labels 
+  # modify to "year" view for y-axis 
   scale_y_discrete(
     breaks = c("2019-01", "2018-01", "2017-01", "2016-01"), # pick only first-month
     labels = c("2019", "2018", "2017", "2016")) + # label it as year - cleaner aesthetic
-
+  # remove leading zero from x-axis 
+  scale_x_discrete(
+    breaks = c("01", "05", "10", "15", "20", "25", "30"), # pick only first-month
+    labels = c("1", "5", "10", "15", "20", "25", "30")) + # label it as year - cleaner aesthetic
   
-  theme(panel.background = element_rect(fill = "#FFFDFA")) + # crucial - removes gray areas from empty cells (i.e. February 30)
+  # crucial - removes gray areas from empty cells (i.e. February 30)
+  theme(panel.background = element_rect(fill = "#FFFDFA")) + 
+  
+  # Titles / Text - size, colours, vjust 
   theme(axis.title.y = element_blank(),
         axis.text.y = element_text(size = 8,
                                vjust = 0.2,
                                colour = "#1C2226"),
+        axis.text.x = element_text(size = 8,
+                                   vjust = 0.2,
+                                   colour = "#1C2226"),
         plot.title = element_text(colour = "#3b474f",
                               hjust = 0,
                               size = 9,
@@ -300,11 +310,13 @@ last.fm.calendar %>%
                                 size = 7,
                                 face = "italic",
                                 margin = margin(5,0,0,0)), # adjust position ... top, bottom, left, right
-        # Remove ticks & titles I don't want 
+        
+        # Remove ticks/titles/labels I don't want 
         axis.ticks.y = element_blank(),
         axis.title.x = element_blank(),
-        axis.text.x = element_blank(),
+        # axis.text.x = element_blank(),
         axis.ticks.x = element_blank(),
+        
         # Aesthetic of legend 
         legend.position = "right", # position to right of plot
         legend.direction = "vertical", # vertical orientation 
@@ -316,6 +328,8 @@ last.fm.calendar %>%
         legend.key.height = grid::unit(0.6,"cm"),
         legend.key.width = grid::unit(0.6,"cm"),
         legend.box.just = "center",
+        
+        # Plot margins / border / fill-colour 
         plot.background = element_rect(fill = "#fffafa"),
         legend.background = element_rect(fill = "#fffafa"),
         panel.border = element_blank(),
