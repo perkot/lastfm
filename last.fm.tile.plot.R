@@ -42,12 +42,14 @@ api_key <- "3201a3f5635a9e01a9bcb836729e3463"
 # -----------------
 
 # Read in song listen history
+last.fm.data.2020 <- UserData$new("Perkski", api_key, 2020) 
 last.fm.data.2019 <- UserData$new("Perkski", api_key, 2019) 
 last.fm.data.2018 <- UserData$new("Perkski", api_key, 2018) 
 last.fm.data.2017 <- UserData$new("Perkski", api_key, 2017)
 last.fm.data.2016 <- UserData$new("Perkski", api_key, 2016)
 
 # extract out data.table from last.fm environment
+last.fm.df.2020 <- as.data.frame(as.list(last.fm.data.2020$data_table))
 last.fm.df.2019 <- as.data.frame(as.list(last.fm.data.2019$data_table))
 last.fm.df.2018 <- as.data.frame(as.list(last.fm.data.2018$data_table))
 last.fm.df.2017 <- as.data.frame(as.list(last.fm.data.2017$data_table))
@@ -57,7 +59,8 @@ last.fm.df.2016 <- as.data.frame(as.list(last.fm.data.2016$data_table))
 last.fm.df <- rbind(last.fm.df.2016, 
                     last.fm.df.2017, 
                     last.fm.df.2018, 
-                    last.fm.df.2019)
+                    last.fm.df.2019,
+                    last.fm.df.2020)
 
 # Look at data-frame
 str(last.fm.df)
@@ -183,10 +186,10 @@ last.fm.df$DayType[is.na(last.fm.df$DayType)] <- "Weekday"
 # -----------------
 
 # Remove df that are not required 
-rm(last.fm.df.2016, last.fm.df.2017, last.fm.df.2018, last.fm.df.2019)
+rm(last.fm.df.2016, last.fm.df.2017, last.fm.df.2018, last.fm.df.2019, last.fm.df.2020)
 
 # Standard .csv export 
-write.csv(last.fm.df, file = "lastfm1619.csv",
+write.csv(last.fm.df, file = "lastfm1620.csv",
           na = "", 
           row.names = FALSE)
 
@@ -266,7 +269,7 @@ last.fm.calendar %>%
   labs(x = "",
        y = "",
        title = "last.fm scrobble history",
-       subtitle = "Daily count of my music listening on itunes between 2016 & 2019",
+       subtitle = "Daily count of itunes song plays between 2016 & 2020",
        caption = "Data-source: last.fm") +
   
   # Guides - a useful way to format legend 
@@ -279,12 +282,12 @@ last.fm.calendar %>%
   # Specify custom axis labels 
   # modify to "year" view for y-axis 
   scale_y_discrete(
-    breaks = c("2019-01", "2018-01", "2017-01", "2016-01"), # pick only first-month
-    labels = c("2019", "2018", "2017", "2016")) + # label it as year - cleaner aesthetic
+    breaks = c("2020-01", "2019-01", "2018-01", "2017-01", "2016-01"), # pick only first-month
+    labels = c("2020", "2019", "2018", "2017", "2016")) + # label it as year - cleaner aesthetic
   # remove leading zero from x-axis 
   scale_x_discrete(
-    breaks = c("01", "05", "10", "15", "20", "25", "30"), # pick only first-month
-    labels = c("1", "5", "10", "15", "20", "25", "30")) + # label it as year - cleaner aesthetic
+    breaks = c("01", "05", "10", "15", "20", "25", "31"), # pick only first-month
+    labels = c("1", "5", "10", "15", "20", "25", "31")) + # label it as year - cleaner aesthetic
   
   # crucial - removes gray areas from empty cells (i.e. February 30)
   theme(panel.background = element_rect(fill = "#FFFDFA")) + 
@@ -337,8 +340,9 @@ last.fm.calendar %>%
         ) 
 p
 
+# Save file 
 ggsave(p,
-       filename="lastfm_tile_plot.png",
+       filename="lastfm_tile_plot2.png",
        height = 8.8,
        width = 8.8,
        units = "in",
