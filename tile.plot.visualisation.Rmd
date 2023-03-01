@@ -275,18 +275,14 @@ last.fm.calendar %>%
 ```
 
 
-```{r vis2, echo=FALSE}
-# export ~ 900 x 2000
-p
-```
-
 ```{r vis export, echo=FALSE}
 ## Export final plot ----
 # Save Plot
 ggsave(p,
        filename = "tile_export.png",
        height = 20,
-       width = 9,
+       width = 10,
+       bg = "#fffafa", # fills entire background of plot 
        units = "in",
        dpi = 600)
 ```
