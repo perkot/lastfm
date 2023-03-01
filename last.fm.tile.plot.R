@@ -186,12 +186,19 @@ last.fm.df$DayType[is.na(last.fm.df$DayType)] <- "Weekday"
 # -----------------
 
 # Remove df that are not required 
-rm(last.fm.df.2016, last.fm.df.2017, last.fm.df.2018, last.fm.df.2019, last.fm.df.2020)
+rm(last.fm.df.2016, 
+   last.fm.df.2017, 
+   last.fm.df.2018, 
+   last.fm.df.2019,
+   last.fm.df.2020)
 
 # Standard .csv export 
 write.csv(last.fm.df, file = "lastfm1620.csv",
           na = "", 
           row.names = FALSE)
+
+# import the data constructed above 
+last.fm.df <- read.csv("lastfm1620.csv")
 
 # -----------------
 # PREPARE FOR VISUALISATION 
@@ -212,6 +219,10 @@ str(last.fm.calendar)
 
 # ensure in df format 
 last.fm.calendar <- as.data.frame(last.fm.calendar)
+
+
+last.fm.calendar <- last.fm.calendar %>% drop_na(Date.EST)
+
 
 # Crucial step 
   # on dates where I have not listened to music, they are absent from the df
@@ -242,9 +253,21 @@ last.fm.calendar$Year <- year(last.fm.calendar$Date.EST)
 # TILE PLOT VISUALISATION 
 # -----------------
 
+# Standard .csv export 
+write.csv(last.fm.calendar, file = "lastfmcalendar.csv",
+          na = "", 
+          row.names = FALSE)
+
+# import the data constructed above 
+last.fm.calendar <- read.csv("lastfmcalendar.csv")
+
+# font-family: Open Sans,Lucida Grande,Helvetica Neue,Helvetica,Arial,Sans-serif;
+
+
+
 # Determine the buckets we want for our legend
 # Alternative legend display to the usual gradient 
-sl <- c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110)
+sl <- c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130)
 
 # Create tile-plot
 p <- 
@@ -268,8 +291,8 @@ last.fm.calendar %>%
   
   labs(x = "",
        y = "",
-       title = "last.fm scrobble history",
-       subtitle = "Daily count of itunes song plays between 2016 & 2020",
+       title = "Daily music listening history",
+       subtitle = "Daily count of song plays between 2016 & 2022",
        caption = "Data-source: last.fm") +
   
   # Guides - a useful way to format legend 
@@ -282,8 +305,8 @@ last.fm.calendar %>%
   # Specify custom axis labels 
   # modify to "year" view for y-axis 
   scale_y_discrete(
-    breaks = c("2020-01", "2019-01", "2018-01", "2017-01", "2016-01"), # pick only first-month
-    labels = c("2020", "2019", "2018", "2017", "2016")) + # label it as year - cleaner aesthetic
+    breaks = c("2022-01", "2021-01", "2020-01", "2019-01", "2018-01", "2017-01", "2016-01"), # pick only first-month
+    labels = c("2022", "2021", "2020", "2019", "2018", "2017", "2016")) + # label it as year - cleaner aesthetic
   # remove leading zero from x-axis 
   scale_x_discrete(
     breaks = c("01", "05", "10", "15", "20", "25", "31"), # pick only first-month

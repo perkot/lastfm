@@ -17,7 +17,7 @@ In this post I turn my attention to data-visualisation with the exceptional *ggp
 
 Our end-state plot is captured below
 
-![Alt text](/Users/perkot/Dropbox/Analytics/Personal/R/git/lastfm/lastfm_tile_plot.png)
+![Alt text](/Users/perkot/GIT/lastfm/tile_export.png)
 The remainder of this post will outline data set-up & code to produce this plot
 
 ## Dependencies 
@@ -41,7 +41,7 @@ library(plotly)
 My [previous post](https://perkot.github.io/lastfm/) outlines the steps required for modeling last.fm scrobble data, including API_key creation, user-specification, package download, data-extraction & cleaning. For brevity, we will read in a cleaned .csv of the data from this post
 
 ```{r API, echo=FALSE}
-last.fm.df <- read.csv("lastfm1619.csv",
+last.fm.df <- read.csv("lastfm_2022.csv",
                        header = TRUE,
                        stringsAsFactors=FALSE)
 ```
@@ -65,6 +65,11 @@ last.fm.calendar <- last.fm.df %>%
 
 # ensure in df format 
 last.fm.calendar <- as.data.frame(last.fm.calendar)
+
+# change blanks to NA 
+last.fm.calendar[last.fm.calendar==""]<-NA
+# remove row with no data or date
+last.fm.calendar <- last.fm.calendar %>% drop_na(Date.EST)
 ```
 
 A problem is that for days I didn't listen to  music, the data doesn't have a record of those dates. We therefore need to create empty records for these dates, so that these *zero-listen* tiles are present in the visualisation :
@@ -108,6 +113,22 @@ Along the *y-axis*, the data will be at a **month** level. However, x-axis label
 setDT(last.fm.calendar)[, yr_month := format(as.Date(Date.EST), "%Y-%m") ]
 ```
 
+```{r DP8, echo=FALSE}
+# Determine the buckets we want for our legend
+# Alternative legend display to the usual gradient 
+sl <- c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130)
+```
+
+```{r DP9, echo=FALSE}
+# Determine the buckets we want for our legend
+# Alternative legend display to the usual gradient 
+# Our colour palette (see slides for how we landed here!)
+tile_c_palette <- c("high_vol" = "#db0909", 
+                   "low_vol" = "#fffafa",
+                   light_text = "#5d6b75",
+                   dark_text =  "#1C2226")
+```
+
 ## Visualisation 
 
 Below is the code to generate the tile-plot shared at the outset. *ggplot2* is amazingly powerful, but can be finicky. As such I have included plenty of comments in the code-chunk, to explain each section 
@@ -124,6 +145,7 @@ Some of the key steps are:
 * custom margins 
 
 ```{r vis1, echo=FALSE}
+# font-family: Open Sans,Lucida Grande,Helvetica Neue,Helvetica,Arial,Sans-serif;
 p <- 
 last.fm.calendar %>% 
   ggplot(aes(x = day,
@@ -143,81 +165,128 @@ last.fm.calendar %>%
                        guide = "legend", # can specify colour scale, or legend format
                        breaks = sl) + # specify breaks (this does not work here)
   
-  labs(x = "",
+  labs(x = "Day",
+       
        y = "",
-       title = "last.fm scrobble history",
-       subtitle = "Daily count of my music listening on itunes between 2016 & 2019",
-       caption = "Data-source: last.fm") +
+       
+       title = "Music listening history
+       ",
+       
+       # subtitle = paste0("
+       # Daily count of my music listening on itunes between 2016 & 2022"
+       
+       # DOES NOT WORK AS CANNOT CUSTOMISE SUBTITLE COLOURS 
+       # <span style='color:", 
+       # tile_c_palette["low_vol"], "'>0</span> -----------------------------------------------------
+       # <span style='color:",
+       # tile_c_palette["high_vol"], "'>120</span>"
+       # ),
+       
+       caption = "
+       Data-source: last.fm") +
   
   # Guides - a useful way to format legend 
-  guides(fill = guide_legend(title = "Daily listens", # title of legend
-                             title.hjust = 0.5, # centre title
+  guides(fill = guide_legend(title.hjust = 0.5, # centre title
                              title.vjust = 0.5, # centre title
-                             breaks = sl, # specify breaks for legend format rather than colour scale
-                             reverse = TRUE)) + # descending rather than ascending order for scale
-
+                             title.position = "top",
+                             title = "Daily listens", # title of legend
+                             # breaks = c("0", "120"), # specify breaks for legend format rather than colour scale
+                             nrow = 1, # only a single row of legend items
+                             label.position = "bottom",
+                             reverse = FALSE)) + # descending rather than ascending order for scale
+  
   # Specify custom axis labels 
   # modify to "year" view for y-axis 
   scale_y_discrete(
-    breaks = c("2019-01", "2018-01", "2017-01", "2016-01"), # pick only first-month
-    labels = c("2019", "2018", "2017", "2016")) + # label it as year - cleaner aesthetic
+    breaks = c("2022-01", "2021-01", "2020-01", "2019-01", "2018-01", "2017-01", "2016-01"), # pick only first-month
+    labels = c("2022", "2021", "2020", "2019", "2018", "2017", "2016"),
+    expand = c(0,0.5)) + # label it as year - cleaner aesthetic
   # remove leading zero from x-axis 
   scale_x_discrete(
-    breaks = c("01", "05", "10", "15", "20", "25", "30"), # pick only first-month
-    labels = c("1", "5", "10", "15", "20", "25", "30")) + # label it as year - cleaner aesthetic
+    breaks = c("01", "05", "10", "15", "20", "25", "31"), # pick only first-month
+    labels = c("1", "5", "10", "15", "20", "25", "31")) + # label it as year - cleaner aesthetic
   
   # crucial - removes gray areas from empty cells (i.e. February 30)
   theme(panel.background = element_rect(fill = "#FFFDFA")) + 
   
   # Titles / Text - size, colours, vjust 
   theme(axis.title.y = element_blank(),
-        axis.text.y = element_text(size = 8,
-                               vjust = 0.2,
-                               colour = "#1C2226"),
-        axis.text.x = element_text(size = 8,
+        axis.text.y = element_text(size = 16,
                                    vjust = 0.2,
-                                   colour = "#1C2226"),
+                                   colour = tile_c_palette["light_text"],
+                                   face = "bold"),
+        axis.title.x = element_text(size = 16,
+                                    vjust = 5.5, # shift in-line with days
+                                    hjust = -0.08, # ~ in-line with years 
+                                    colour = tile_c_palette["light_text"],
+                                    family = "Helvetica Neue",
+                                    face = "bold"),
+        axis.text.x = element_text(size = 16,
+                                   vjust = 0.2,
+                                   colour = tile_c_palette["light_text"],
+                                   family = "Helvetica Neue",
+                                   face = "bold"),
         plot.title = element_text(colour = "#3b474f",
-                              hjust = 0,
-                              size = 9,
-                              face = "bold"),
-        plot.subtitle = element_text(colour = "#5d6b75",
-                                 hjust = 0,
-                                 size = 8),
+                                  hjust = 0.5,
+                                  size = 20,
+                                  face = "bold",
+                                  family = "Helvetica Neue"),
+        plot.subtitle = element_text(colour = tile_c_palette["light_text"],
+                                     hjust = 0,
+                                     size = 16,
+                                     family = "Helvetica Neue",
+                                     face = "bold"),
         plot.caption = element_text(colour = "#5d6b75",
-                                hjust = 0,
-                                vjust = 1,
-                                size = 7,
-                                face = "italic",
-                                margin = margin(5,0,0,0)), # adjust position ... top, bottom, left, right
+                                    hjust = 0,
+                                    vjust = 1,
+                                    size = 14,
+                                    face = "italic",
+                                    family = "Helvetica Neue",
+                                    margin = margin(5,0,0,0)), # adjust position ... top, bottom, left, right
         
         # Remove ticks/titles/labels I don't want 
         axis.ticks.y = element_blank(),
-        axis.title.x = element_blank(),
+        # axis.title.x = element_blank(),
         # axis.text.x = element_blank(),
         axis.ticks.x = element_blank(),
         
+        # legend.position = "none",
+        
         # Aesthetic of legend 
-        legend.position = "right", # position to right of plot
-        legend.direction = "vertical", # vertical orientation 
-        legend.title = element_text(colour = "#1C2226", # colour of title text
-                                    size = 8), # size of text 
-        legend.margin = margin(0,0,0,0.2,"cm"), # move a little away from plot, to the right
-        legend.text = element_text(colour = "#1C2226",
-                                   size = 8),
+        legend.position = "top", # position to right of plot
+        legend.direction = "horizontal", # vertical orientation
+        legend.title = element_text(colour = tile_c_palette["light_text"], # colour of title text
+                                    size = 18,
+                                    face = "bold"), # size of text
+        # legend.title = element_blank(),
+        legend.margin = margin(0,0,0,0,"cm"), # move a little away from plot, to the right
+        legend.text = element_text(colour = tile_c_palette["light_text"],
+                                   size = 16),
         legend.key.height = grid::unit(0.6,"cm"),
         legend.key.width = grid::unit(0.6,"cm"),
-        legend.box.just = "center",
+        legend.box.just = "centre",
         
         # Plot margins / border / fill-colour 
         plot.background = element_rect(fill = "#fffafa"),
         legend.background = element_rect(fill = "#fffafa"),
         panel.border = element_blank(),
         plot.margin = margin(0.7,0.7,0.7,0.7,"cm") # top, right, bottom, left
-        ) 
+  ) 
 ```
 
 
 ```{r vis2, echo=FALSE}
+# export ~ 900 x 2000
 p
+```
+
+```{r vis export, echo=FALSE}
+## Export final plot ----
+# Save Plot
+ggsave(p,
+       filename = "tile_export.png",
+       height = 20,
+       width = 9,
+       units = "in",
+       dpi = 600)
 ```
